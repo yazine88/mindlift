@@ -766,3 +766,5 @@ button.lesson-ref:active { transform: scale(0.99); }
 .news-art.news-logo { display: flex; align-items: center; justify-content: center; background: var(--teal-soft); color: var(--teal); }
 .news-art.news-logo svg, .news-art.news-logo .i { width: 52px; height: 52px; stroke-width: 1.4; }
 @media (min-width: 700px) { .news-art.news-logo svg, .news-art.news-logo .i { width: 64px; height: 64px; } }
+.wel-bar .musicbtn { color: #fff; background: rgba(255, 255, 255, 0.18); border-color: transparent; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.wel-bar .musicbtn .eq i { background: #fff; }

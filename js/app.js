@@ -150,7 +150,7 @@ const T = {
     f3t: 'A little practice', f3d: 'A one-minute game each day, just for fun.',
     f4t: 'One article from the news', f4d: 'Summed up for you, with a link to the original.',
     noAccountLine: 'No account. Everything stays on this device.',
-    makeItMine: 'Make it mine', skipStart: 'Skip and start today’s question',
+    makeItMine: 'Make it mine', skipStart: 'Skip and go to MindLift',
     logoAlt: 'MindLift logo: a dot lifting off a line', madeBy: 'Made by Yacine Belalia', madeByLabel: 'Made by', rights: '© 2026 Yacine Belalia. All rights reserved.',
     setupOver: 'Make it yours', setupTitle: 'A few quick choices', setupBody: 'You can change any of this later in Settings.',
     nameLabel: 'What should we call you?', namePh: 'Your first name', nameNote: 'Optional. It stays on this device.', yourName: 'Your name',
@@ -302,7 +302,7 @@ const T = {
     f3t: 'Un peu de pratique', f3d: 'Un petit jeu d’une minute par jour, juste pour le plaisir.',
     f4t: 'Un article de l’actualité', f4d: 'Résumé pour vous, avec un lien vers l’original.',
     noAccountLine: 'Aucun compte. Tout reste sur cet appareil.',
-    makeItMine: 'Personnaliser', skipStart: 'Passer et commencer la question du jour',
+    makeItMine: 'Personnaliser', skipStart: 'Passer et aller à MindLift',
     logoAlt: 'Logo de MindLift : un point qui s’élève au-dessus d’une ligne', madeBy: 'Créé par Yacine Belalia', madeByLabel: 'Créé par', rights: '© 2026 Yacine Belalia. Tous droits réservés.',
     setupOver: 'À votre goût', setupTitle: 'Quelques choix rapides', setupBody: 'Vous pourrez tout changer plus tard dans les paramètres.',
     nameLabel: 'Comment voulez-vous qu’on vous appelle?', namePh: 'Votre prénom', nameNote: 'Facultatif. Il reste sur cet appareil.', yourName: 'Votre prénom',
@@ -489,7 +489,7 @@ const SETUP_V = 3;   // bump to show the introduction + setup again to everyone 
 function defaults() {
   let lang = 'en';
   try { if ((navigator.language || '').toLowerCase().startsWith('fr')) lang = 'fr'; } catch (e) { }
-  return { lang, theme: 'system', size: 1, mode: 'read', showWeek: true, showPractice: true, sound: true, music: true, musicVol: 1, voice: 'ava', name: '', setup: 0, interests: [], onboarded: false, log: [], saved: [], artRead: [], practice: practiceDefaults() };
+  return { lang, theme: 'light', themeV: 2, size: 1, mode: 'read', showWeek: true, showPractice: true, sound: true, music: true, musicVol: 1, voice: 'ava', name: '', setup: 0, interests: [], onboarded: false, log: [], saved: [], artRead: [], practice: practiceDefaults() };
 }
 function load() {
   try {
@@ -511,6 +511,8 @@ function load() {
       d.voice = VOICES.includes(d.voice) ? d.voice : (OLD_VOICE[d.voice] || 'ava');
       d.name = typeof d.name === 'string' ? d.name.replace(/\s+/g, ' ').trim().slice(0, 30) : '';
       d.setup = typeof d.setup === 'number' ? d.setup : 0;
+      // Oct 2026: light became the default; move everyone still on the old default once (they can pick System or Dark again).
+      if (d.themeV !== 2) { if (d.theme === 'system') d.theme = 'light'; d.themeV = 2; }
       return d;
     }
   } catch (e) { }
@@ -1121,7 +1123,7 @@ function renderWelcome() {
   if (p.logo) html += '<div class="wel-logo wl-' + p.logo + (p.hero ? ' wl-hero' : '') + '">' + logoArt(p.logo) + '</div>';
   if (p.today) { const tl = todayLesson(); if (tl) html += '<div class="wel-tag"><span>' + esc(t('qotd')) + ' · ' + esc(t('min', { n: tl.min })) + '</span>' + esc(L(tl).t) + '</div>'; }
   html += '</div>';
-  html += '<div class="wel-bar">' + (i > 0 ? '<button type="button" class="iconbtn" data-act="wp-back" aria-label="' + esc(t('back')) + '">' + icon('back') + '</button>' : '') + (p.hero ? '' : brand(false)) + '<span style="flex:1"></span>' + langSeg('lang-w') + (last || i === 0 ? '' : '<button type="button" class="btn btn-ghost btn-sm wel-skip" data-act="wp-skip">' + esc(t('skip')) + '</button>') + '</div>';
+  html += '<div class="wel-bar">' + (i > 0 ? '<button type="button" class="iconbtn" data-act="wp-back" aria-label="' + esc(t('back')) + '">' + icon('back') + '</button>' : '') + (p.hero ? '' : brand(false)) + '<span style="flex:1"></span>' + musicBtn() + langSeg('lang-w') + (last || i === 0 ? '' : '<button type="button" class="btn btn-ghost btn-sm wel-skip" data-act="wp-skip">' + esc(t('skip')) + '</button>') + '</div>';
   html += '<div class="wel-sheet" style="--wel-btn:' + p.btn + '"><div class="wel-in step" data-swipe="wp">';
   html += '<span class="t-over spark">' + esc(t(p.k + 'o', { i: i + 1, n })) + '</span><h1 class="wel-h" id="welcome-h" tabindex="-1">' + esc(t(p.k + 't')) + '</h1>';
   (T[S.lang][p.k + 'p'] || T.en[p.k + 'p']).forEach(par => { html += '<p class="wel-p">' + esc(par) + '</p>'; });
@@ -1840,6 +1842,8 @@ function getCtx() {
     if (!SFX.ctx) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
+      // iPhone: let music and sounds play even when the ring/silent switch is on silent (like the narration does).
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { }
       SFX.ctx = new AC();
       SFX.out = SFX.ctx.createGain(); SFX.out.gain.value = 0.7;
       const comp = SFX.ctx.createDynamicsCompressor();
@@ -2000,13 +2004,26 @@ function musicOrder() {
   for (let k = o.length - 1; k > 0; k--) { const j = Math.floor(Math.random() * (k + 1)); [o[k], o[j]] = [o[j], o[k]]; }
   return (MUSIC.order = o);
 }
-function trackAt(i) { return musicOrder()[((i % MUSIC_TRACKS.length) + MUSIC_TRACKS.length) % MUSIC_TRACKS.length]; }
+// A fresh shuffle for every round of the playlist; a round never starts with the track that just ended.
+function trackAt(i) {
+  const n = MUSIC_TRACKS.length, r = Math.floor(i / n), k = ((i % n) + n) % n;
+  MUSIC.rounds = MUSIC.rounds || [];
+  while (MUSIC.rounds.length <= r) {
+    const o = MUSIC_TRACKS.map((_, j) => j);
+    for (let a = o.length - 1; a > 0; a--) { const b = Math.floor(Math.random() * (a + 1)); [o[a], o[b]] = [o[b], o[a]]; }
+    const prev = MUSIC.rounds[MUSIC.rounds.length - 1];
+    if (prev && o[0] === prev[n - 1]) { const sw = 1 + Math.floor(Math.random() * (n - 1)); [o[0], o[sw]] = [o[sw], o[0]]; }
+    MUSIC.rounds.push(o);
+  }
+  return MUSIC.rounds[r][k];
+}
 // Fetch and decode one track; keep only the tracks we need right now (decoded audio is large).
 function musicFetch(k) {
   if (MUSIC.bufs[k]) return Promise.resolve(MUSIC.bufs[k]);
   if (MUSIC.loads[k]) return MUSIC.loads[k];
   const ac = getCtx(); if (!ac) return Promise.reject(new Error('no audio'));
-  MUSIC.loads[k] = fetch(MUSIC_TRACKS[k].url).then(r => { if (!r.ok) throw new Error('http'); return r.arrayBuffer(); })
+  const pre = musicPrefetch.p && k === trackAt(0) ? musicPrefetch.p.then(ab => { musicPrefetch.p = null; return ab; }) : null;
+  MUSIC.loads[k] = (pre ? pre.then(ab => ab || fetch(MUSIC_TRACKS[k].url).then(r => r.arrayBuffer())) : fetch(MUSIC_TRACKS[k].url).then(r => { if (!r.ok) throw new Error('http'); return r.arrayBuffer(); }))
     .then(ab => new Promise((res, rej) => { const p = ac.decodeAudioData(ab, res, rej); if (p && p.catch) p.catch(rej); }))
     .then(b => { MUSIC.bufs[k] = b; delete MUSIC.loads[k]; return b; }, e => { delete MUSIC.loads[k]; throw e; });
   return MUSIC.loads[k];
@@ -2026,8 +2043,9 @@ function musicStartTrack(i, pos, fadeIn) {
   if (old) { try { old.g.gain.cancelScheduledValues(now); old.g.gain.setValueAtTime(old.g.gain.value, now); old.g.gain.linearRampToValueAtTime(0, now + MUSIC_XF); old.src.stop(now + MUSIC_XF + 0.1); } catch (e) { } }
   MUSIC.cur = { src, g, t0: now - pos, len: span.len }; MUSIC.i = i;
   clearTimeout(MUSIC.timer);
-  const left = span.len - pos;
-  // Load the next track now; start it MUSIC_XF seconds before this one ends.
+  // Change song more often: each song plays about 60–90 s (or until it ends), then crossfades into the next one.
+  const left = Math.min(span.len - pos, 60 + Math.random() * 30);
+  // Load the next track now; start it MUSIC_XF seconds before this one's turn ends.
   const nk = trackAt(i + 1);
   musicFetch(nk).then(() => musicTrim([k, nk])).catch(() => { });
   MUSIC.timer = setTimeout(musicNext, Math.max(0, (left - MUSIC_XF) * 1000));
@@ -2035,7 +2053,7 @@ function musicStartTrack(i, pos, fadeIn) {
 function musicNext() {
   if (!MUSIC.playing) return;
   const i = MUSIC.i + 1, nk = trackAt(i);
-  musicFetch(nk).then(() => { if (MUSIC.playing && MUSIC.i === i - 1) musicStartTrack(i, 0, MUSIC_XF); },
+  musicFetch(nk).then(b => { if (MUSIC.playing && MUSIC.i === i - 1) musicStartTrack(i, Math.random() * trackSpan(nk, b).len * 0.45, MUSIC_XF); },
     () => { if (MUSIC.playing && MUSIC.i === i - 1) { MUSIC.i = i; musicNext(); } });
 }
 function musicLoad() {
@@ -2052,6 +2070,7 @@ function musicPlay() {
   if (!MUSIC.bufs[trackAt(MUSIC.i)]) { if (!MUSIC.failed) musicLoad().then(() => { if (MUSIC.bufs[trackAt(MUSIC.i)]) musicPlay(); }); return; }
   if (!MUSIC.gain) { MUSIC.gain = ac.createGain(); MUSIC.gain.gain.value = 0; MUSIC.gain.connect(ac.destination); }
   MUSIC.playing = true; MUSIC.cur = null;
+  if (!MUSIC.started) { MUSIC.started = true; const b0 = MUSIC.bufs[trackAt(MUSIC.i)]; if (b0) MUSIC.pos = Math.random() * Math.max(0, trackSpan(trackAt(MUSIC.i), b0).len * 0.6); }
   musicStartTrack(MUSIC.i, MUSIC.pos, 0);
   const now = ac.currentTime, g = MUSIC.gain.gain;
   g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(musicTarget(), now + 2.5);
@@ -2085,11 +2104,25 @@ function grabName() {
 function markOnboarded() { S.onboarded = true; S.setup = SETUP_V; }
 function welcomeToast() { toast(S.name ? t('allSetName', { name: S.name }) : t('allSet')); }
 // Browsers only allow sound after a tap: start the music on the first one (and after the app comes back).
-document.addEventListener('pointerdown', (ev) => {
+// Unlock audio inside the tap itself (a silent blip), so music that finishes downloading a moment later can still play.
+function audioUnlock() {
+  const ac = getCtx(); if (!ac || audioUnlock.done) return;
+  try { const b = ac.createBuffer(1, 1, 22050), src = ac.createBufferSource(); src.buffer = b; src.connect(ac.destination); src.start(0); audioUnlock.done = true; } catch (e) { }
+}
+// Fetch the first track's file early (no sound, no audio context yet) so the music can begin right on the first tap.
+function musicPrefetch() {
+  if (!S.music || musicPrefetch.p) return;
+  const k = trackAt(MUSIC.i);
+  musicPrefetch.p = fetch(MUSIC_TRACKS[k].url).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null);
+}
+function onFirstGesture(ev) {
+  audioUnlock();
   if (!S.music || MUSIC.playing || MUSIC.loading) return;
-  if (ev.target && ev.target.closest && ev.target.closest('[data-act="music"], [data-act="music-pref"]')) return;
+  if (ev && ev.target && ev.target.closest && ev.target.closest('[data-act="music"], [data-act="music-pref"]')) return;
   musicPlay();
-}, true);
+}
+document.addEventListener('pointerdown', onFirstGesture, true);
+document.addEventListener('touchend', onFirstGesture, true);
 document.addEventListener('keydown', () => { if (S.music && !MUSIC.playing && !MUSIC.loading) musicPlay(); }, true);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') { if (MUSIC.playing) { MUSIC.resume = true; musicPause(); } }
@@ -2116,7 +2149,7 @@ document.addEventListener('click', (ev) => {
       break;
     }
     case 'lang': S.lang = v; persist(); stopSpeak(); render(); { const b = document.querySelector('[data-act="lang"][data-v="' + v + '"]'); if (b) b.focus(); } break;
-    case 'welcome-start': markOnboarded(); persist(); openLesson(todayLesson().id); break;
+    case 'welcome-start': markOnboarded(); persist(); V.layer = null; V.tab = 'today'; render('#page-h'); window.scrollTo(0, 0); break;
     case 'setup': V.setupFrom = 'welcome'; V.layer = 'setup'; render('#setup-h'); break;
     case 'make-mine': V.setupFrom = 'you'; V.layer = 'setup'; render('#setup-h'); break;
     case 'setup-save': grabName(); persist(); V.layer = null; V.tab = 'you'; render('#page-h'); toast(S.name ? t('allSetName', { name: S.name }) : t('prefsSaved')); break;
@@ -2289,7 +2322,14 @@ function bootError() {
   document.getElementById('boot-retry').onclick = () => { root.innerHTML = ''; boot(); };
 }
 let hotData = {};
-function boot() { loadData().then(() => { loadArticles(); start(hotData); }, bootError); }
+function musicAutostart() {
+  if (!S.music) return;
+  musicPrefetch();
+  const ac = getCtx(); if (!ac) return;
+  const go = () => { if (ac.state === 'running') musicPlay(); };
+  if (ac.state === 'running') musicPlay(); else { try { const r = ac.resume(); if (r && r.then) r.then(go, () => { }); } catch (e) { } }
+}
+function boot() { loadData().then(() => { loadArticles(); start(hotData); setTimeout(musicAutostart, 150); }, bootError); }
 function start(data) {
   try { if (data && data.V) { Object.assign(V, data.V, { sheet: null }); if (V.lesson && !byId(V.lesson.id)) { V.lesson = null; if (V.layer === 'lesson') V.layer = null; } if (V.game || V.layer === 'game') { V.game = null; if (V.layer === 'game') V.layer = null; } } } catch (e) { }
   render();
