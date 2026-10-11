@@ -394,8 +394,10 @@ const COVERS = {};     // filled from data/media.json (painted covers: key -> th
 const COVER_GRID = [12, 6];
 function coverKey(lessonOrCat) {
   if (!lessonOrCat) return null;
-  const k = typeof lessonOrCat === 'string' ? lessonOrCat : pad2(lessonOrCat.day);
-  return k in COVERS ? k : null;
+  if (typeof lessonOrCat === 'string') return lessonOrCat in COVERS ? lessonOrCat : null;
+  const k = pad2(lessonOrCat.day);
+  if (k in COVERS) return k;
+  return lessonOrCat.cat in COVERS ? lessonOrCat.cat : null;   // no painting yet: use the subject's painting
 }
 function coverImg(k, cls, eager) { return '<img class="' + cls + '" src="img/c/' + k + '.jpg" alt=""' + (eager ? ' fetchpriority="high"' : ' loading="lazy"') + ' decoding="async">'; }
 function art(lessonOrCat, fit, label) {
@@ -743,7 +745,7 @@ function syncListen() {
   document.querySelectorAll('[data-act="voice-sample"]').forEach(s => {
     const on = TTS.speaking && TTS.what === 'sample-' + s.dataset.v;
     s.setAttribute('aria-pressed', String(on));
-    s.innerHTML = icon(on ? 'pause' : 'listen', 'i-md');
+    s.innerHTML = icon(on ? 'pause' : 'listen', 'i-md') + (s.classList.contains('wel-chip') ? '<span>' + esc(on ? t('stop') : t('hearVoice', { name: t('v_' + s.dataset.v) })) + '</span>' : '');
   });
   const ab = document.getElementById('art-listen');
   if (ab) {
@@ -1033,38 +1035,43 @@ function tabbar() {
 /* ================= Layers ================= */
 // Animated logo for the welcome screen: the line draws in, the dot lifts off it, a warm glow appears,
 // the name settles underneath, then the dot keeps floating gently. Same proportions as the MindLift mark.
-function logoArt() {
-  let s = '<svg class="art logo-anim" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid meet" role="img" aria-label="' + esc(t('logoAlt')) + '" style="background:var(--surface-2)"><rect x="-800" width="2000" height="240" style="fill:var(--surface-2)"/>';
-  for (let y = 20, i = 0; y <= 220; y += 20, i++) s += '<path class="ks la-line" d="M-800 ' + y + 'H1200" stroke-opacity="0.07" style="animation-delay:' + (i * 45) + 'ms"/>';
-  s += '<circle class="sf la-tw" cx="104" cy="58" r="4" style="animation-delay:2.4s"/><circle class="v la-tw" cx="300" cy="44" r="3" style="animation-delay:3.3s"/><circle class="d la-tw" cx="318" cy="128" r="3.5" style="fill:var(--teal);animation-delay:4.1s"/>';
+// onPaint: drawn over a painting (no paper background, white name).
+function logoArt(onPaint) {
+  let s = '<svg class="art logo-anim' + (onPaint ? ' on-paint' : '') + '" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid meet" role="img" aria-label="' + esc(t('logoAlt')) + '"' + (onPaint ? '' : ' style="background:var(--surface-2)"') + '>';
+  if (!onPaint) {
+    s += '<rect x="-800" width="2000" height="240" style="fill:var(--surface-2)"/>';
+    for (let y = 20, i = 0; y <= 220; y += 20, i++) s += '<path class="ks la-line" d="M-800 ' + y + 'H1200" stroke-opacity="0.07" style="animation-delay:' + (i * 45) + 'ms"/>';
+  }
+  s += '<circle class="sf la-tw" cx="104" cy="58" r="4" style="animation-delay:2.4s"/><circle class="v la-tw" cx="300" cy="44" r="3" style="animation-delay:3.3s"/><circle class="d la-tw" cx="318" cy="128" r="3.5" style="fill:' + (onPaint ? '#fff' : 'var(--teal)') + ';animation-delay:4.1s"/>';
+  if (onPaint) s += '<circle class="la-ring" cx="200" cy="84" r="30"/><circle class="la-ring r2" cx="200" cy="84" r="30"/>';
   s += '<g class="la-float"><g class="la-breathe"><circle class="sf la-halo la-in" cx="200" cy="84" r="44" fill-opacity="0.55"/></g><circle class="v la-dot la-in" cx="200" cy="84" r="26"/></g>';
-  s += '<rect class="k la-bar la-in" x="152" y="129" width="96" height="12" rx="6"/>';
-  s += '<text class="la-word la-in" x="200" y="190" text-anchor="middle" style="font-family:var(--serif);font-size:34px;font-weight:600;letter-spacing:-0.01em;fill:var(--ink)">MindLift</text>';
+  s += '<rect class="' + (onPaint ? '' : 'k ') + 'la-bar la-in" x="152" y="129" width="96" height="12" rx="6"' + (onPaint ? ' style="fill:' + (onPaint === 'white' ? '#fff' : '#16181D') + '"' : '') + '/>';
+  s += '<text class="la-word la-in" x="200" y="190" text-anchor="middle" style="font-family:var(--serif);font-size:34px;font-weight:600;letter-spacing:-0.01em;fill:' + (onPaint === 'white' ? '#fff' : onPaint ? '#16181D' : 'var(--ink)') + '">MindLift</text>';
   return s + '</svg>';
 }
+// Welcome pages: a painting on top (img/w/N.jpg), a cream sheet with the words underneath.
 const WP = [
-  { k: 'wp0', art: 'logo' },
-  { k: 'wp1', art: 'cards' },
-  { k: 'wp2', art: 'listen' },
-  { k: 'wp3', art: 'articles' },
-  { k: 'wp4', art: 'spark' }
+  { k: 'wp0', img: 1, logo: 'white', hero: true, btn: '#5B5A36' },
+  { k: 'wp1', img: 2, today: true, btn: '#6B4A2F' },
+  { k: 'wp2', img: 3, hear: true, btn: '#5C3B26' },
+  { k: 'wp3', img: 4, btn: '#7A4424' },
+  { k: 'wp4', img: 5, logo: 'white', hero: true, btn: '#344D64' }
 ];
-function obArt(p) {
-  if (p.art === 'logo') return logoArt();
-  return '<div class="ob-logo">' + logoArt() + '<span class="ob-badge">' + icon(p.art) + '</span></div>';
-}
 function renderWelcome() {
   const n = WP.length, i = Math.max(0, Math.min(n - 1, V.wp || 0)), p = WP[i], last = i === n - 1;
-  let html = '<div class="layer" role="dialog" aria-modal="true" aria-labelledby="welcome-h"><div class="flow">';
-  html += '<div class="flow-bar" style="margin-inline:0">' + (i > 0 ? '<button type="button" class="iconbtn" data-act="wp-back" aria-label="' + esc(t('back')) + '" style="margin-left:-8px">' + icon('back') + '</button>' : '') + brand(true) + '<span style="flex:1"></span>' + langSeg('lang-w') + (last ? '' : '<button type="button" class="btn btn-ghost btn-sm" data-act="wp-skip" style="margin-right:-12px">' + esc(t('skip')) + '</button>') + '</div>';
-  html += '<div class="flow-body step ob" data-swipe="wp">';
-  html += '<div class="ob-art">' + obArt(p) + '</div>';
-  html += '<div class="ob-text"><span class="t-over' + (i === 0 ? ' spark' : '') + '">' + esc(t(p.k + 'o', { i: i + 1, n })) + '</span><h1 class="' + (i === 0 ? 't-display' : 't-h1') + '" id="welcome-h" tabindex="-1">' + esc(t(p.k + 't')) + '</h1>';
-  (T[S.lang][p.k + 'p'] || T.en[p.k + 'p']).forEach(par => { html += '<p>' + esc(par) + '</p>'; });
+  if (i + 1 < n) { const pre = new Image(); pre.src = 'img/w/' + WP[i + 1].img + '.jpg'; }
+  let html = '<div class="layer wel' + (last ? ' wel-last' : '') + '" role="dialog" aria-modal="true" aria-labelledby="welcome-h">';
+  html += '<div class="wel-art"><img class="wel-img" src="img/w/' + p.img + '.jpg" alt="" fetchpriority="high" decoding="async"><span class="wel-shade" aria-hidden="true"></span>';
+  if (p.logo) html += '<div class="wel-logo wl-' + p.logo + (p.hero ? ' wl-hero' : '') + '">' + logoArt(p.logo) + '</div>';
+  if (p.today) { const tl = todayLesson(); if (tl) html += '<div class="wel-tag"><span>' + esc(t('qotd')) + ' · ' + esc(t('min', { n: tl.min })) + '</span>' + esc(L(tl).t) + '</div>'; }
   html += '</div>';
-  if (last) html += '<div class="ob-foot"><p class="signature">' + esc(t('madeBy')) + '</p><p class="t-caption" style="text-align:center;font-weight:400">' + esc(t('rights')) + '</p></div>';
-  html += '</div>';
-  html += '<div class="flow-foot"><div class="ob-dots" role="group" aria-label="' + esc(t('obPages')) + '">';
+  html += '<div class="wel-bar">' + (i > 0 ? '<button type="button" class="iconbtn" data-act="wp-back" aria-label="' + esc(t('back')) + '">' + icon('back') + '</button>' : '') + (p.hero ? '' : brand(false)) + '<span style="flex:1"></span>' + langSeg('lang-w') + (last || i === 0 ? '' : '<button type="button" class="btn btn-ghost btn-sm wel-skip" data-act="wp-skip">' + esc(t('skip')) + '</button>') + '</div>';
+  html += '<div class="wel-sheet" style="--wel-btn:' + p.btn + '"><div class="wel-in step" data-swipe="wp">';
+  html += '<span class="t-over spark">' + esc(t(p.k + 'o', { i: i + 1, n })) + '</span><h1 class="wel-h" id="welcome-h" tabindex="-1">' + esc(t(p.k + 't')) + '</h1>';
+  (T[S.lang][p.k + 'p'] || T.en[p.k + 'p']).forEach(par => { html += '<p class="wel-p">' + esc(par) + '</p>'; });
+  if (p.hear) html += '<div><button type="button" class="wel-chip" data-act="voice-sample" data-v="ava" aria-pressed="false">' + icon('listen', 'i-md') + '<span>' + esc(t('hearVoice', { name: t('v_ava') })) + '</span></button></div>';
+  if (last) html += '<div class="wel-sig"><p class="signature">' + esc(t('madeBy')) + '</p><p class="t-caption">' + esc(t('rights')) + '</p></div>';
+  html += '</div><div class="wel-foot"><div class="ob-dots" role="group" aria-label="' + esc(t('obPages')) + '">';
   for (let k = 0; k < n; k++) html += '<button type="button" class="ob-dot" data-act="wp-go" data-v="' + k + '"' + (k === i ? ' aria-current="step"' : '') + ' aria-label="' + esc(t('obPage', { i: k + 1, n })) + '"></button>';
   html += '</div>';
   if (last) html += '<button type="button" class="btn btn-primary btn-block" data-act="setup"><span>' + esc(t('makeItMine')) + '</span>' + icon('arrow', 'i-md') + '</button><button type="button" class="btn btn-ghost btn-block" data-act="welcome-start">' + esc(t('skipStart')) + '</button>';

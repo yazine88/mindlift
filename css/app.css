@@ -603,7 +603,7 @@ button.lesson-ref:active { transform: scale(0.99); }
 @keyframes la-float { 0%, 100% { transform: none; } 50% { transform: translateY(-5px); } }
 @keyframes la-breathe { 0%, 100% { transform: none; } 50% { transform: scale(1.06); } }
 @keyframes la-tw { 0%, 100% { opacity: 0; transform: scale(0.6); } 45%, 55% { opacity: 1; transform: none; } }
-.layer.still-layer .logo-anim .la-in { animation: none !important; }
+.layer.still-layer .logo-anim:not(.on-paint) .la-in { animation: none !important; }
 @media (prefers-reduced-motion: reduce) {
   .logo-anim .la-in, .logo-anim .la-float, .logo-anim .la-breathe { animation: none !important; }
   .logo-anim .la-tw { animation: none !important; opacity: 0.8; }
@@ -695,3 +695,70 @@ button.lesson-ref:active { transform: scale(0.99); }
 .boot-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); animation: boot-pulse 1.2s ease-in-out infinite; }
 @keyframes boot-pulse { 0%, 100% { opacity: 0.25; transform: scale(0.8); } 50% { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .boot-dot { animation: none; } }
+
+/* ---------- Welcome: a painting on top, a cream sheet with the words underneath */
+.layer.wel { display: flex; flex-direction: column; }
+.wel-art { position: relative; flex: none; height: clamp(300px, 60vh, 640px); overflow: hidden; background: #2a2f3a; }
+.wel-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 40%; transform-origin: 50% 40%; animation: wel-zoom 16s ease-out both; }
+@keyframes wel-zoom { from { transform: scale(1.1); } to { transform: none; } }
+.wel-shade { position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(10, 14, 22, 0.45) 0, rgba(10, 14, 22, 0) 140px); }
+.wel-bar { position: absolute; top: 0; left: 0; right: 0; z-index: 2; display: flex; align-items: center; gap: 10px; max-width: 640px; margin: 0 auto; padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 0; color: #fff; }
+.wel-bar .brand { color: #fff; }
+.wel-bar .brand svg { width: 34px; height: 34px; }
+.wel-bar .brand-name { font-size: 27px; line-height: 32px; text-shadow: 0 1px 10px rgba(0, 0, 0, 0.3); }
+.wel-bar .mark-bar { fill: #fff; }
+.wel-bar .iconbtn { color: #fff; background: transparent; border-color: transparent; }
+.wel-bar .seg { background: rgba(255, 255, 255, 0.18); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.wel-bar .seg button { color: rgba(255, 255, 255, 0.85); min-width: 40px; padding: 0 10px; }
+.wel-bar .seg button[aria-pressed="true"] { background: #fff; color: #16181D; }
+.wel-bar .wel-skip { color: #fff; padding-inline: 10px; }
+.wel-logo { position: absolute; left: 0; right: 0; top: 18%; display: flex; justify-content: center; }
+.wel-logo svg { width: min(420px, 100%); height: auto; overflow: visible; filter: drop-shadow(0 4px 18px rgba(30, 20, 0, 0.18)); }
+.wel-tag { position: absolute; left: 16px; bottom: 50px; max-width: calc(100% - 32px); display: flex; flex-direction: column; gap: 2px; padding: 9px 13px; border-radius: 14px; background: rgba(255, 255, 255, 0.93); color: #16181D; font-family: var(--serif); font-size: 17px; line-height: 22px; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18); }
+.wel-tag span { font-family: var(--sans); font-size: 11px; line-height: 14px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #C4401F; }
+.wel-sheet { position: relative; flex: 1 0 auto; margin-top: -30px; border-radius: 28px 28px 0 0; background: var(--bg); display: flex; flex-direction: column; box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.08); }
+.wel-in { width: 100%; max-width: 600px; margin: 0 auto; padding: 26px 22px 0; display: flex; flex-direction: column; gap: 10px; }
+.wel-h { font-family: var(--serif); font-weight: 500; font-size: 32px; line-height: 37px; letter-spacing: -0.01em; text-wrap: balance; }
+.wel-p { font-family: var(--serif); font-size: 19px; line-height: 27px; color: var(--muted); }
+.wel-chip { display: inline-flex; align-items: center; gap: 8px; margin-top: 4px; min-height: 40px; padding: 0 16px 0 12px; border: 0; border-radius: var(--r-pill); background: var(--teal-soft); color: var(--teal); font-size: 15px; font-weight: 600; cursor: pointer; }
+.wel-chip:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.wel-sig { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+.wel-sig .signature, .wel-sig .t-caption { text-align: left; font-weight: 400; }
+.wel-foot { width: 100%; max-width: 600px; margin: auto auto 0; padding: 18px 20px calc(20px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 10px; }
+@media (max-height: 700px) { .wel-art { height: 52vh; } .wel-h { font-size: 28px; line-height: 33px; } .wel-p { font-size: 17px; line-height: 24px; } }
+@media (prefers-reduced-motion: reduce) { .wel-img { animation: none; } }
+.wel-last .wel-art { height: clamp(250px, 46vh, 520px); }
+.wel-last .wel-logo { top: 12%; }
+.wel-bar .iconbtn { margin-left: -8px; margin-right: -6px; }
+@media (max-width: 400px) {
+  .wel-bar { gap: 6px; padding-inline: 12px; }
+  .wel-bar .brand-name { font-size: 24px; }
+  .wel-bar .brand svg { width: 30px; height: 30px; }
+  .wel-bar .seg button { min-width: 34px; padding: 0 8px; min-height: 36px; }
+  .wel-bar .wel-skip { padding-inline: 6px; }
+}
+.wel-logo.wl-hero { top: 9%; }
+.wel-logo.wl-hero::before { content: ""; position: absolute; left: 50%; top: 50%; width: 125%; max-width: 540px; aspect-ratio: 1.45; transform: translate(-50%, -50%); background: radial-gradient(closest-side, rgba(40, 30, 20, 0.42), rgba(40, 30, 20, 0.22) 55%, rgba(40, 30, 20, 0) 100%); pointer-events: none; }
+.wel-logo.wl-hero svg { position: relative; width: min(440px, 112%); filter: drop-shadow(0 2px 10px rgba(20, 12, 0, 0.45)); }
+@media (max-height: 700px) { .wel-logo.wl-hero { top: 4%; } .wel-logo.wl-hero svg { width: min(340px, 90%); } }
+/* Welcome logo on a painting: livelier ongoing motion (a slow float, a breathing glow, soft rings spreading out) */
+.logo-anim.on-paint .la-float { animation: la-float-big 4.2s ease-in-out 2.2s infinite; }
+.logo-anim.on-paint .la-breathe { animation: la-breathe-big 4.2s ease-in-out 2.2s infinite; }
+.logo-anim.on-paint .la-ring { fill: none; stroke: #fff; stroke-width: 2; opacity: 0; transform-box: fill-box; transform-origin: center; animation: la-ring 4.2s ease-out 2.2s infinite; }
+.logo-anim.on-paint .la-ring.r2 { animation-delay: 4.3s; }
+.logo-anim.on-paint .la-word { animation: la-word 750ms cubic-bezier(0.2, 0.8, 0.2, 1) 1250ms both, la-glow 4.2s ease-in-out 2.2s infinite; }
+@keyframes la-float-big { 0%, 100% { transform: none; } 50% { transform: translateY(-10px); } }
+@keyframes la-breathe-big { 0%, 100% { transform: none; opacity: 1; } 50% { transform: scale(1.14); opacity: 0.8; } }
+@keyframes la-ring { 0% { transform: scale(0.9); opacity: 0.55; } 100% { transform: scale(2.6); opacity: 0; } }
+@keyframes la-glow { 0%, 100% { opacity: 1; } 50% { opacity: 0.86; } }
+@media (prefers-reduced-motion: reduce) { .logo-anim.on-paint .la-ring { display: none; } .logo-anim.on-paint .la-float, .logo-anim.on-paint .la-breathe, .logo-anim.on-paint .la-word { animation: none !important; } }
+/* Welcome sheet colour: warm sand fading into soft sage. It stays light in dark mode too, so the light tokens are set here. */
+.wel-sheet { --bg: #E2E1CE; --surface: #FFFFFF; --surface-2: #D8D9C4; --line: #B9BBA6; --ink: #16181D; --muted: #5F5D4C; --on-ink: #F5F2EC; --accent: #C4401F; --teal: #1F5E5B; --teal-soft: #CFDAC8; color: var(--ink); background: linear-gradient(180deg, #EADBC4 0%, #E2E1CE 45%, #D9E2D0 100%); color-scheme: light; }
+.layer.wel { background: #D9E2D0; }
+.wel-sheet .ob-dot { background: #B3B6A0; }
+.wel-sheet .ob-dot[aria-current="step"] { background: #16181D; }
+.wel-sheet .btn-ghost { background: rgba(255, 255, 255, 0.45); color: #16181D; }
+/* Each welcome page's main button takes a deep colour from its painting */
+.wel-foot .btn-primary, .wel-foot .btn-primary:hover { background: var(--wel-btn, #16181D); border-color: var(--wel-btn, #16181D); color: #fff; }
+.wel-sheet .ob-dot[aria-current="step"] { background: var(--wel-btn, #16181D); }
+.wel-foot .btn-primary { transition: background-color 300ms var(--ease); }
