@@ -400,6 +400,8 @@ function coverKey(lessonOrCat) {
   return lessonOrCat.cat in COVERS ? lessonOrCat.cat : null;   // no painting yet: use the subject's painting
 }
 function coverImg(k, cls, eager) { return '<img class="' + cls + '" src="img/c/' + k + '.jpg" alt=""' + (eager ? ' fetchpriority="high"' : ' loading="lazy"') + ' decoding="async">'; }
+// The original subject drawing (not the painting), e.g. for Today's article card.
+function catDrawing(cat) { return '<svg class="art cat-' + cat + '" viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect class="t" width="400" height="240"/>' + artInner(cat) + '</svg>'; }
 function art(lessonOrCat, fit, label) {
   const ck = coverKey(lessonOrCat);
   if (ck) {
@@ -701,20 +703,73 @@ function speakText(text, what, onDone) {
   TTS.synth = true; TTS.speaking = true; TTS.what = what || null;
   ss.speak(u); syncListen();
 }
-function autoNext(lesson, i) {
-  return () => setTimeout(() => {
-    if (S.mode !== 'listen' || V.layer !== 'lesson' || !V.lesson || V.lesson.id !== lesson.id || V.lesson.step !== 'card' || V.lesson.i !== i || V.sheet) return;
-    nextCard();
-  }, 700);
+/* Listen mode: one continuous player per lesson. The lesson's narration is a single file (question, then card 1, 2, …),
+   so it plays straight through on ONE audio element and the screen follows along: when the voice reaches the next card,
+   the next card is shown. Nothing is restarted between cards (phones block audio that starts without a tap, and
+   restarting is what made parts repeat). Next/Previous jump the voice to that card; Listen pauses and resumes. */
+const LS = { el: null, lesson: null, src: '', parts: null, on: false, target: -1, part: -1 };
+function lessonAudio(lesson) {
+  for (const v of voiceOrder()) { const key = v + '/' + S.lang + '/' + pad2(lesson.day); if (SPRITES[key]) return { url: 'audio/s/' + key + '.mp3', parts: SPRITES[key] }; }
+  return null;
 }
-function playCard(lesson, i) { playUrls(cardUrls(lesson, i), 'card', (L(lesson).s[i] || []).join('. '), S.mode === 'listen' ? autoNext(lesson, i) : null); }
-// The question itself (title + hook), read before card 1: a recorded intro (DD-0.mp3) if one exists, otherwise the device voice.
-function playIntroThenCard(lesson) {
-  const x = L(lesson);
-  playUrls(segs(lesson, 0), 'card', x.t + ' ' + x.h, () => setTimeout(() => {
-    if (V.layer === 'lesson' && V.lesson && V.lesson.id === lesson.id && V.lesson.step === 'card' && V.lesson.i === 0) playCard(lesson, 0);
-  }, 500));
+function lsEl() {
+  if (LS.el) return LS.el;
+  const a = new Audio(); a.preload = 'auto'; LS.el = a;
+  const seekNow = () => {
+    if (LS.target < 0) return;
+    const t = LS.target, sk = a.seekable, ok = sk && sk.length && sk.end(sk.length - 1) > t;
+    if (!ok && t > 0.5 && !a.src.startsWith('blob:')) {   // the server can't jump inside the file: load it whole once
+      const url = LS.src, B = playUrls.blobs = playUrls.blobs || {};
+      (B[url] || (B[url] = fetch(url).then(r => r.ok ? r.blob() : Promise.reject()).then(x => URL.createObjectURL(x))))
+        .then(bu => { if (LS.src === url && LS.on) { a.src = bu; try { const pr = a.play(); if (pr && pr.catch) pr.catch(() => { }); } catch (e) { } } }, () => { delete B[url]; });
+      return;
+    }
+    try { a.currentTime = t; } catch (e) { }
+  };
+  a.addEventListener('loadedmetadata', seekNow);
+  a.addEventListener('timeupdate', () => {
+    if (!LS.on || !LS.parts) return;
+    const t = a.currentTime;
+    if (LS.target >= 0) { if (Math.abs(t - LS.target) < 0.4) { LS.target = -1; a.muted = false; } else { if (a.readyState >= 1 && !a.seeking) seekNow(); return; } }
+    const P = LS.parts, last = P.length - 1;
+    if (t >= P[last][1] - 0.05) { lsStop(); if (lessonOpen(LS.lesson) && V.lesson.step === 'card') setStep('keys'); return; }
+    let k = 0; for (let j = 0; j <= last; j++) if (t >= P[j][0] - 0.05) k = j;
+    if (k !== LS.part) { LS.part = k; if (k >= 1) lsShowCard(k - 1); }
+  });
+  a.addEventListener('playing', () => { if (LS.on) { TTS.speaking = true; TTS.what = 'card'; syncListen(); } });
+  a.addEventListener('ended', () => { if (!LS.on) return; lsStop(); if (lessonOpen(LS.lesson) && V.lesson.step === 'card') setStep('keys'); });
+  a.addEventListener('error', () => { if (!LS.on) return; lsStop(); toast(t('noVoice')); });
+  return a;
 }
+function lessonOpen(lesson) { return lesson && V.layer === 'lesson' && V.lesson && V.lesson.id === lesson.id; }
+function lsShowCard(i) {
+  if (!lessonOpen(LS.lesson)) { lsStop(); return; }
+  if (V.lesson.step === 'card' && V.lesson.i === i) return;
+  if (V.lesson.step !== 'card' && V.lesson.step !== 'intro') { lsStop(); return; }
+  Object.assign(V.lesson, { step: 'card', i });
+  render('#step-h');
+  syncListen();
+  const layer = document.getElementById('lesson-layer'); if (layer) layer.scrollTop = 0;
+}
+// Start (or jump) the lesson voice at part k: 0 = the question, 1..n = cards.
+function lsPlay(lesson, k) {
+  const m = lessonAudio(lesson);
+  if (!m || !m.parts[k]) { lsStop(); const x = L(lesson); speakText(k === 0 ? x.t + ' ' + x.h : (x.s[k - 1] || []).join('. '), 'card'); return; }
+  stopSpeak();
+  const a = lsEl();
+  LS.lesson = lesson; LS.parts = m.parts; LS.on = true; LS.part = k; LS.target = m.parts[k][0];
+  if (LS.src !== m.url) { LS.src = m.url; a.src = m.url; }
+  a.muted = a.readyState >= 1 ? false : true;
+  if (a.readyState >= 1) { try { a.currentTime = LS.target; } catch (e) { } }
+  TTS.speaking = true; TTS.what = 'card'; syncListen();
+  try { const pr = a.play(); if (pr && pr.catch) pr.catch(err => { if (LS.el === a && err && err.name === 'NotAllowedError') { LS.on = false; TTS.speaking = false; syncListen(); } }); } catch (e) { }
+}
+function lsStop() {
+  if (LS.el) { try { LS.el.pause(); } catch (e) { } }
+  const was = LS.on; LS.on = false; LS.target = -1;
+  if (was && TTS.what === 'card') { TTS.speaking = false; TTS.what = null; syncListen(); }
+}
+function playCard(lesson, i) { lsPlay(lesson, i + 1); }
 function playArticle(a) { playUrls(articleUrls(a), 'article', articleScript(a)); }
 // Voice preview (audio/voices/<voice>-<lang>.mp3). If a sample is missing, it plays the current narration
 // (first card of today's lesson) and says so, instead of failing silently.
@@ -734,6 +789,7 @@ function preloadCard(lesson, i) {
 }
 preloadCard.done = {};
 function stopSpeak() {
+  if (LS.on) lsStop();
   const a = TTS.el; TTS.el = null;
   if (a) { try { a.pause(); a.removeAttribute('src'); a.load(); } catch (e) { } }
   if (TTS.synth) { TTS.synth = false; try { window.speechSynthesis.cancel(); } catch (e) { } }
@@ -861,7 +917,7 @@ function artMeta(a) {
 function newsCard(a) {
   const x = AL(a), isToday = a.date === ymd(new Date());
   const over = isToday ? t('fromNews') : t('fromNews') + ' · ' + shortDate(a.date);
-  return '<button type="button" class="news" data-act="article" data-id="' + esc(a.id) + '"><div class="news-art">' + art(a.cat, 'thumb') + '</div><div class="news-body"><span class="t-over spark">' + esc(over) + '</span><span class="news-title">' + esc(x.t) + '</span>' + (x.h ? '<span class="news-hook">' + esc(x.h) + '</span>' : '') + '<span class="t-caption">' + esc([a.source, t('minRead', { n: a.min })].filter(Boolean).join(' · ')) + (isArtRead(a.id) ? ' · ' + esc(t('artDone')) : '') + '</span></div></button>';
+  return '<button type="button" class="news" data-act="article" data-id="' + esc(a.id) + '"><div class="news-art">' + catDrawing(a.cat) + '</div><div class="news-body"><span class="t-over spark">' + esc(over) + '</span><span class="news-title">' + esc(x.t) + '</span>' + (x.h ? '<span class="news-hook">' + esc(x.h) + '</span>' : '') + '<span class="t-caption">' + esc([a.source, t('minRead', { n: a.min })].filter(Boolean).join(' · ')) + (isArtRead(a.id) ? ' · ' + esc(t('artDone')) : '') + '</span></div></button>';
 }
 function artRow(a) {
   const x = AL(a);
@@ -1125,6 +1181,11 @@ function progressBar(filled, total, label) {
   for (let i = 0; i < total; i++) s += '<span' + (i < filled ? ' class="on"' : '') + '></span>';
   return s + '</div>';
 }
+// While the question is being read aloud, Start becomes Next (skips straight to card 1).
+function introStartBtn(l) {
+  const reading = LS.on && LS.lesson === l && LS.part === 0;
+  return '<button type="button" class="btn btn-primary btn-block" data-act="step" data-v="card0">' + (reading ? '<span>' + esc(t('next')) + '</span>' + icon('arrow', 'i-md') : icon('play', 'i-md') + '<span>' + esc(t('start')) + '</span>') + '</button>';
+}
 function renderLesson() {
   const st = V.lesson, l = byId(st.id), x = L(l), n = x.s.length, total = n + 3;
   const close = '<button type="button" class="iconbtn" data-act="close-lesson" aria-label="' + esc(t('closeLesson')) + '">' + icon('x') + '</button>';
@@ -1136,13 +1197,13 @@ function renderLesson() {
     html += '<div class="cover-text step"><div class="intro-tags">' + tag(l.cat) + evChip(l) + '</div><h1 class="t-h1" id="step-h" tabindex="-1">' + esc(x.t) + '</h1><p class="t-hook">' + esc(x.h) + '</p>' + metaLine(l, true) + '</div>';
     html += '<div class="flow-foot">';
     if (TTS.ok) html += '<div class="seg lg" role="group" aria-label="' + esc(t('lessonMode')) + '"><button type="button" data-act="mode" data-v="read" aria-pressed="' + (S.mode !== 'listen') + '">' + icon('read', 'i-md') + esc(t('read')) + '</button><button type="button" data-act="mode" data-v="listen" aria-pressed="' + (S.mode === 'listen') + '">' + icon('listen', 'i-md') + esc(t('listen')) + '</button></div>';
-    html += '<button type="button" class="btn btn-primary btn-block" data-act="step" data-v="card0">' + icon('play', 'i-md') + '<span>' + esc(t('start')) + '</span></button></div>';
+    html += introStartBtn(l) + '</div>';
   } else if (st.step === 'intro') {
     html += '<div class="intro-art">' + art(l) + '<div class="float"><button type="button" class="iconbtn raised" data-act="close-lesson" aria-label="' + esc(t('closeLesson')) + '">' + icon('x') + '</button>' + saveBtn(l.id, 'raised') + '</div></div>';
     html += '<div class="flow-body step"><div class="intro-tags">' + tag(l.cat) + evChip(l) + '</div><h1 class="t-h1" id="step-h" tabindex="-1">' + esc(x.t) + '</h1><p class="t-hook">' + esc(x.h) + '</p>' + metaLine(l, true) + '</div>';
     html += '<div class="flow-foot">';
     if (TTS.ok) html += '<div class="seg lg" role="group" aria-label="' + esc(t('lessonMode')) + '"><button type="button" data-act="mode" data-v="read" aria-pressed="' + (S.mode !== 'listen') + '">' + icon('read', 'i-md') + esc(t('read')) + '</button><button type="button" data-act="mode" data-v="listen" aria-pressed="' + (S.mode === 'listen') + '">' + icon('listen', 'i-md') + esc(t('listen')) + '</button></div>';
-    html += '<button type="button" class="btn btn-primary btn-block" data-act="step" data-v="card0">' + icon('play', 'i-md') + '<span>' + esc(t('start')) + '</span></button></div>';
+    html += introStartBtn(l) + '</div>';
   } else if (st.step === 'card') {
     const sec = x.s[st.i];
     html += '<div class="flow-bar">' + close + progressBar(st.i + 1, total) + '<button type="button" class="iconbtn" data-act="size" aria-label="' + esc(t('textSize')) + '">' + icon('textsize') + '</button></div>';
@@ -1150,7 +1211,6 @@ function renderLesson() {
     html += '<div class="flow-foot"><div class="row-btns"><button type="button" class="iconbtn lg raised" data-act="prev" aria-label="' + esc(t('prevCard')) + '">' + icon('back') + '</button>';
     if (TTS.ok) html += '<button type="button" class="btn" id="listen-btn" data-act="listen" aria-pressed="false">' + icon('listen', 'i-md') + '<span>' + esc(t('listen')) + '</span></button>';
     html += '<button type="button" class="btn btn-primary" data-act="next"><span>' + esc(t('next')) + '</span>' + icon('arrow', 'i-md') + '</button></div>';
-    if (st.i === 0) html += '<p class="hint">' + esc(t('cardHint')) + '</p>';
     html += '</div>';
   } else if (st.step === 'keys') {
     html += '<div class="flow-bar">' + close + progressBar(n + 1, total) + saveBtn(l.id) + '</div>';
@@ -1344,13 +1404,14 @@ function openLesson(id) {
   const layer = document.getElementById('lesson-layer'); if (layer) layer.scrollTop = 0;
 }
 function setStep(step, extra) {
-  stopSpeak();
+  const keepVoice = step === 'card' && S.mode === 'listen';
+  if (!keepVoice) stopSpeak();
   Object.assign(V.lesson, { step }, extra || {});
   const l = byId(V.lesson.id);
   if (step === 'keys') markRead(l.id);
   render('#step-h');
   const layer = document.getElementById('lesson-layer'); if (layer) layer.scrollTop = 0;
-  if (step === 'card') { if (S.mode === 'listen') { if (extra && extra.intro) playIntroThenCard(l); else playCard(l, V.lesson.i); } preloadCard(l, V.lesson.i + 1); }
+  if (step === 'card') { if (S.mode === 'listen') { if (!(LS.on && LS.lesson === l && LS.part === V.lesson.i + 1)) lsPlay(l, V.lesson.i + 1); else syncListen(); } else preloadCard(l, V.lesson.i + 1); }
 }
 function nextCard() {
   const l = byId(V.lesson.id), n = L(l).s.length;
@@ -2086,9 +2147,12 @@ document.addEventListener('click', (ev) => {
     case 'layer': V.layer = v; render('#set-h'); break;
     case 'close-layer': V.layer = null; render('#page-h'); break;
     case 'close-lesson': closeLesson(); break;
-    case 'mode': S.mode = v; persist(); render(); { const b = document.querySelector('[data-act="mode"][data-v="' + v + '"]'); if (b) b.focus(); } break;
+    case 'mode': S.mode = v; persist(); if (v === 'read') stopSpeak(); render(); { const b = document.querySelector('[data-act="mode"][data-v="' + v + '"]'); if (b) b.focus(); } break;
     case 'step':
-      if (v === 'card0') setStep('card', { i: 0, intro: S.mode === 'listen' });
+      if (v === 'card0') {
+        if (S.mode === 'listen' && !(LS.on && lessonOpen(LS.lesson))) { const l = byId(V.lesson.id); if (lessonAudio(l)) { lsPlay(l, 0); render(); { const b = document.querySelector('[data-act="step"][data-v="card0"]'); if (b) b.focus(); } break; } }
+        setStep('card', { i: 0 });
+      }
       else if (v === 'quiz') setStep('quiz', { qi: 0, picked: null });
       else setStep(v);
       break;
@@ -2096,7 +2160,7 @@ document.addEventListener('click', (ev) => {
     case 'prev': prevCard(); break;
     case 'listen': {
       if (TTS.speaking && TTS.what === 'card') { stopSpeak(); if (S.mode === 'listen') { S.mode = 'read'; persist(); } }
-      else { if (S.mode !== 'listen') { S.mode = 'listen'; persist(); } playCard(byId(V.lesson.id), V.lesson.i); }
+      else { if (S.mode !== 'listen') { S.mode = 'listen'; persist(); } lsPlay(byId(V.lesson.id), V.lesson.i + 1); }
       break;
     }
     case 'size': S.size = (S.size + 1) % 3; persist(); applyPrefs(); break;

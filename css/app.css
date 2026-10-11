@@ -762,3 +762,7 @@ button.lesson-ref:active { transform: scale(0.99); }
 .wel-foot .btn-primary, .wel-foot .btn-primary:hover { background: var(--wel-btn, #16181D); border-color: var(--wel-btn, #16181D); color: #fff; }
 .wel-sheet .ob-dot[aria-current="step"] { background: var(--wel-btn, #16181D); }
 .wel-foot .btn-primary { transition: background-color 300ms var(--ease); }
+/* Today's article card: a newspaper badge instead of the subject painting */
+.news-art.news-logo { display: flex; align-items: center; justify-content: center; background: var(--teal-soft); color: var(--teal); }
+.news-art.news-logo svg, .news-art.news-logo .i { width: 52px; height: 52px; stroke-width: 1.4; }
+@media (min-width: 700px) { .news-art.news-logo svg, .news-art.news-logo .i { width: 64px; height: 64px; } }
